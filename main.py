@@ -3,25 +3,44 @@ import re
 import webbrowser
 import pyttsx3
 import speech_recognition as sr
+from gtts import gTTS
+import pygame
+import os
+import chatbot
 
 recognizer = sr.Recognizer()
 engine = pyttsx3.init()
+apikey="your news api key"
+
 
 def speak(text):
-    engine.say(text)
-    engine.runAndWait()
+    tts=gTTS(text=text,lang='en',slow=False)
+    tts.save('temp.mp3')
+    pygame.mixer.init()
+    pygame.mixer.music.load('temp.mp3')
+    pygame.mixer.music.play()
+    while pygame.mixer.music.get_busy():
+        pygame.time.Clock().tick(10)
+
+    pygame.mixer.music.unload()
+    os.remove('temp.mp3')
+
 
 def get_first_youtube_video_url(query):
     search_url = f"https://www.youtube.com/results?search_query={query}"
     response = requests.get(search_url)
     html = response.text
     
-    # Using regex to find the first video URL
+  
     match = re.search(r"\"videoId\":\"(.*?)\"", html)
     if match:
         video_id = match.group(1)
         return f"https://www.youtube.com/watch?v={video_id}"
     return None
+
+def refine_text(text):
+    cleaned_text = re.sub(r'[^\w\s]', '', text)
+    return cleaned_text
 
 def process_command(command):
     if "open google" in command.lower():
@@ -60,9 +79,22 @@ def process_command(command):
         query=f"https://www.google.com/search?q={remaining}"
         speak(f"searching {remaining}")
         webbrowser.open(query)
+    elif "news" in command.lower():
+        r=requests.get(f"https://newsapi.org/v2/top-headlines?country=in&apikey={apikey}")
+        if r.status_code==200:
+            data=r.json()
+            articles=data.get('articles',[])
+
+            for article in articles:
+                speak(article['title'])
+    else:
+        text=command.lower()
+        answer=chatbot.answer_anything(text)
+        answer=refine_text(answer)
+        speak(answer)
 
 if __name__ == "__main__":
-    speak("Initializing Jarvis")
+    speak("Hi srijan I am your assistent alexa")
     while True:
         print("Recognizing...")
         try:
@@ -76,7 +108,8 @@ if __name__ == "__main__":
                     audio = recognizer.listen(source, timeout=3)
                 command = recognizer.recognize_google(audio)
                 process_command(command)
-                
+            
+                #print(command)
                 
         except Exception as e:
             print(f"Error: {e}")
